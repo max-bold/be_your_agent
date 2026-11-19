@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>be_your_agent</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <strong>be_your_agent</strong><span class="muted">/ human model workbench</span>
+      <span id="connection" class="connection">Connecting</span>
+      <label class="mode-label"
+        >Mode
+        <select id="chat-mode">
+          <option value="human">Human</option>
+          <option value="proxy">Proxy</option>
+        </select></label
+      >
+      <label class="mode-label"
+        >Model
+        <select id="active-upstream" aria-label="Upstream model"></select></label
+      ><button id="upstream-settings">Edit models</button
+      ><button id="api-help">API endpoints</button
+      ><button id="mcp-settings">MCP servers <span id="mcp-count">0</span></button>
+    </header>
+    <main class="workspace">
+      <aside class="chats panel" aria-label="Chats">
+        <div class="panel-heading">Chats <button id="new-chat" title="New chat">+</button></div>
+        <nav id="chats"></nav>
+        <div class="chat-footer">
+          <button id="rename-chat">Rename chat</button>
+          <p>Requests without a chat reference start a new chat.</p>
+        </div>
+      </aside>
+      <section class="tools panel" aria-label="Tools">
+        <div class="panel-heading">Tools <span id="tool-count" class="muted">0</span></div>
+        <label class="sr-only" for="tool-search">Filter tools</label
+        ><input id="tool-search" type="search" placeholder="Filter tools…" />
+        <div id="tools"></div>
+      </section>
+      <section class="editor panel" aria-label="Tool request">
+        <div class="panel-heading">
+          Request <span id="editor-source" class="muted">Select a tool</span>
+        </div>
+        <div class="request-selector">
+          <label for="pending-request">Responding to</label
+          ><select id="pending-request">
+            <option>No pending requests</option></select
+          ><button id="cancel-request" title="Cancel selected API request" disabled>Cancel</button>
+        </div>
+        <div id="draft-calls" class="draft-calls"></div>
+        <div class="editor-content">
+          <div id="tool-empty" class="empty">
+            <span class="empty-symbol">{ }</span>
+            <h1>You are the model.</h1>
+            <p>Receive an API request, choose a tool, or connect an MCP server to start.</p>
+          </div>
+          <div id="tool-editor" hidden>
+            <div class="title-row">
+              <h1 id="tool-name"></h1>
+              <span id="source-badge" class="badge"></span>
+            </div>
+            <p id="tool-description" class="description"></p>
+            <div class="tabs">
+              <button id="fields-tab" aria-pressed="true">Fields</button
+              ><button id="json-tab" aria-pressed="false">JSON</button
+              ><button id="schema-tab" aria-pressed="false">Schema</button>
+            </div>
+            <form id="tool-form" novalidate>
+              <div id="fields"></div>
+              <textarea
+                id="arguments-json"
+                aria-label="Tool arguments JSON"
+                spellcheck="false"
+                hidden
+              >
+{}</textarea>
+              <pre id="schema-json" hidden></pre>
+              <div class="tool-actions">
+                <button id="run-tool" type="submit" class="primary">Add to response</button
+                ><span id="tool-hint" class="muted"></span>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div id="editor-error" role="alert" class="error"></div>
+      </section>
+      <section class="composer panel" aria-label="Text response">
+        <div class="panel-heading">
+          <label for="response-text">Text response</label
+          ><span id="response-target" class="muted">Waiting for API request</span>
+        </div>
+        <textarea
+          id="response-text"
+          spellcheck="false"
+          placeholder="Write the assistant’s response…"
+        ></textarea>
+        <div class="composer-footer">
+          <span id="draft-summary" class="muted">No tool calls</span
+          ><button id="preview-response" disabled>Preview JSON</button
+          ><button id="send-response" class="primary" disabled>
+            Send response <kbd>Ctrl ↵</kbd>
+          </button>
+        </div>
+      </section>
+      <section class="inbox panel" aria-label="Inbox">
+        <div class="panel-heading">Inbox <span id="inbox-count" class="muted">0 entries</span></div>
+        <div class="inbox-controls">
+          <div class="filter-tabs">
+            <button data-filter="all" aria-pressed="true">All</button
+            ><button data-filter="request">Requests</button
+            ><button data-filter="response">Replies</button
+            ><button data-filter="tool-call">Tool calls</button
+            ><button data-filter="tool-result">MCP results</button>
+          </div>
+          <label><input id="auto-scroll" type="checkbox" checked /> Follow</label
+          ><button id="export-chat" title="Export chat JSON">Export</button>
+        </div>
+        <div id="feed" class="feed" aria-live="polite"></div>
+      </section>
+      <div
+        class="resize-handle"
+        data-boundary="chats"
+        role="separator"
+        aria-label="Resize chats"
+        tabindex="0"
+      ></div>
+      <div
+        class="resize-handle"
+        data-boundary="tools"
+        role="separator"
+        aria-label="Resize tools"
+        tabindex="0"
+      ></div>
+      <div
+        class="resize-handle"
+        data-boundary="editor"
+        role="separator"
+        aria-label="Resize request and inbox"
+        tabindex="0"
+      ></div>
+    </main>
+    <footer class="statusbar">
+      <span id="status" role="status">Ready</span
+      ><span>Local workbench · responses are sent manually</span>
+    </footer>
+    <dialog id="mcp-dialog" class="settings-dialog">
+      <header>
+        <div>
+          <h2>MCP servers</h2>
+          <p class="muted">Connections stay open while you use the workbench.</p>
+        </div>
+        <button data-close="mcp-dialog" aria-label="Close MCP settings">×</button>
+      </header>
+      <div class="settings-body">
+        <aside>
+          <div id="server-list"></div>
+          <button id="new-server">+ Add server</button
+          ><button id="session-runner-preset">Session runner preset</button>
+        </aside>
+        <form id="mcp-form" novalidate>
+          <input id="server-id" type="hidden" />
+          <div class="form-grid">
+            <label>Name<input id="server-name" required placeholder="My MCP server" /></label
+            ><label
+              >Transport<select id="server-transport">
+                <option value="stdio">Local process · stdio</option>
+                <option value="http">Streamable HTTP</option>
+                <option value="sse">Legacy SSE</option>
+              </select></label
+            >
+          </div>
+          <div id="stdio-settings">
+            <label>Command<input id="server-command" placeholder="node" /></label
+            ><label
+              >Arguments <span class="muted">JSON array</span
+              ><textarea id="server-args" spellcheck="false">[]</textarea></label
+            ><label
+              >Working directory<input id="server-cwd" placeholder="D:\Projects\my-server" /></label
+            ><label
+              >Environment <span class="muted">JSON object · saved values are masked</span
+              ><textarea id="server-env" spellcheck="false">{}</textarea>
+            </label>
+          </div>
+          <div id="http-settings" hidden>
+            <label
+              >Server URL<input
+                id="server-url"
+                type="url"
+                placeholder="https://example.com/mcp" /></label
+            ><label
+              >Authentication<select id="server-auth">
+                <option value="none">None / custom headers</option>
+                <option value="bearer">Bearer token</option>
+                <option value="basic">HTTP Basic</option>
+              </select></label
+            ><label id="bearer-settings" hidden
+              >Token<input id="server-token" type="password" autocomplete="off"
+            /></label>
+            <div id="basic-settings" class="form-grid" hidden>
+              <label>Username<input id="server-username" autocomplete="off" /></label
+              ><label
+                >Password<input id="server-password" type="password" autocomplete="off"
+              /></label>
+            </div>
+            <label
+              >Additional headers <span class="muted">JSON object · saved values are masked</span
+              ><textarea id="server-headers" spellcheck="false">{}</textarea>
+            </label>
+          </div>
+          <label
+            >Tool timeout (seconds)<input
+              id="server-timeout"
+              type="number"
+              min="1"
+              max="600"
+              value="180"
+          /></label>
+          <p class="hint">
+            Credentials are stored locally on this computer. Saving a configuration disconnects that
+            server. Connect explicitly when ready.
+          </p>
+          <div id="mcp-error" class="error" role="alert"></div>
+          <div class="settings-actions">
+            <button id="remove-server" type="button" class="danger">Remove</button
+            ><button type="submit" class="primary">Save configuration</button
+            ><button id="connect-server" type="button">Connect</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+    <dialog id="info-dialog">
+      <header>
+        <h2 id="info-title"></h2>
+        <button data-close="info-dialog" aria-label="Close">×</button>
+      </header>
+      <div id="info-content"></div>
+    </dialog>
+    <dialog id="upstream-dialog">
+      <header>
+        <div>
+          <h2>Upstream models</h2>
+          <p class="muted">
+            Enabled models appear in the toolbar. Proxy mode translates incoming requests
+            automatically.
+          </p>
+        </div>
+        <button data-close="upstream-dialog" aria-label="Close upstream settings">×</button>
+      </header>
+      <div class="model-settings">
+        <aside>
+          <button id="new-upstream">+ Add model</button>
+          <div id="upstream-list"></div>
+        </aside>
+        <form id="upstream-form">
+          <label
+            >Display name<input id="upstream-name" placeholder="Model or connection name"
+          /></label>
+          <label
+            >API style<select id="upstream-protocol">
+              <option value="anthropic">Anthropic Messages</option>
+              <option value="chat-completions">OpenAI Chat Completions</option>
+              <option value="responses">OpenAI Responses</option>
+            </select></label
+          >
+          <label
+            >Full API endpoint URL<input
+              id="upstream-url"
+              type="url"
+              required
+              placeholder="https://api.anthropic.com/v1/messages"
+          /></label>
+          <div class="form-grid">
+            <label>API key<input id="upstream-key" type="password" autocomplete="off" /></label
+            ><label
+              >Model override <span class="muted">optional</span
+              ><input id="upstream-model" placeholder="Use the client’s model"
+            /></label>
+          </div>
+          <label
+            >Additional headers <span class="muted">JSON object</span
+            ><textarea id="upstream-headers" spellcheck="false">{}</textarea>
+          </label>
+          <div class="form-grid">
+            <label class="checkbox-label"
+              ><input id="upstream-mcp" type="checkbox" checked /> Expose connected MCP tools</label
+            ><label
+              >Maximum model rounds<input
+                id="upstream-rounds"
+                type="number"
+                min="1"
+                max="50"
+                value="12"
+            /></label>
+          </div>
+          <p class="hint">
+            MCP calls execute in this app. Client-defined tool calls return to the client. Mixed
+            tool catalogues use one call per model response to keep those execution paths separate.
+            Upstream tokens are billed by the provider.
+          </p>
+          <div id="upstream-error" class="error" role="alert"></div>
+          <div class="settings-actions">
+            <button type="button" id="remove-upstream">Remove model</button
+            ><button type="submit" class="primary">Save upstream</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+    <dialog id="name-dialog">
+      <form id="name-form">
+        <header><h2 id="name-title">New chat</h2></header>
+        <label>Name<input id="chat-name" required maxlength="100" autofocus /></label>
+        <div class="settings-actions">
+          <button type="button" data-close="name-dialog">Cancel</button
+          ><button class="primary" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

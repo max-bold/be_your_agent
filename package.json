@@ -1,0 +1,34 @@
+{
+  "name": "be-your-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A human-operated model API and MCP workbench",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "build": "tsc",
+    "start": "node dist/src/main.js",
+    "check": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "format": "prettier --write src web tests scripts README.md *.json",
+    "format:check": "prettier --check src web tests scripts README.md *.json",
+    "test:ui": "node --import tsx scripts/ui-smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "ajv": "8.20.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "@playwright/test": "1.65.1",
+    "@types/node": "26.6.6",
+    "openai": "^7.60.0",
+    "prettier": "3.10.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}
